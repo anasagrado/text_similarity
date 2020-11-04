@@ -1,3 +1,56 @@
+"""
+
+This module aims to provide an easy to use module for semantic comparision
+between sentences.
+
+textSimilarity class should be instanced with a configuration in a dictionary form
+that specify the diferent steps to perform to the similarity between two classes
+
+
+---------->>>>> PARAMETERS NEEDED
+- is_tokenized :  specify weather the input sentence is tokenized or not
+- selection_method : method to select the concept in wordNet
+    a. 'lesk' : use lesk algorithm to decide which concept to choose
+    b. 'first_value' : choose the first value among all the concepts
+    c. 'word_and_lesk : it'll use the lesk algorithm to choose the concept
+        but in case the word is not in wordNet db, it will preserve the word
+        as a string
+    d. 'raw_words' : use this method when using the lexical similarity functions
+        similarity_word2vec and words_similarity
+- lexical_similarity : similarity measure between two word, Currently implemented
+    a. wordnet_path_similarity
+    b. wordnet_lch_similarity
+    c. wordnet_wup_similarity
+    d. wordnet_res_similarity : needs corpusIC
+    e. wordnet_jcn_similarity : needs corpusIC
+    f. wordnet_lin_similarity : needs corpusIC
+    g. words_similarity
+    h. similarity_word2vec
+- vector_similarity : given two vectors this function will give a similarity score
+    a. jaccard_similarity : this function differs from the other vector function
+       because it works on the raw word and doesn't need a lexical similarity function
+    b. cosine_similarity : this function will use the cosine_similairty to compute the
+       distance between two numerical vectors
+    c. mean_similarity : this function will compute the double mean of the vectors
+
+---------->>>>> OPTIONAL PARAMETERS
+- corpus_ic: Describe the data to use to create the information content
+    a. 'ic-brown.dat'
+    b. 'ic-semcor.dat'
+
+Other preprocessing optional parameters are
+- is_tokenized : Weather the input sentence is tokenized or not :  True or False
+- lemmantize: If True it will lemmantize the sentence
+- filter_tags : list of tags to filter among ["J","N","V","R"]
+
+- vector_threshold : numerical lower threshold to decide weather or not
+  to account for that similarity. For examples, if we have the similarity vectors
+  v1 = [0.01, 0.5, 0.8] and v2 = [ 0.0, 0.06, 0.9]
+  and we set the threshold to 0.1 then v1 and v2 will become
+  v1 = [0.0 , 0.5, 0.8] and v2 = [ 0.0, 0.0, 0.9]
+
+"""
+
 import sys
 from nltk.corpus.reader import WordNetError
 import nltk
@@ -23,6 +76,8 @@ class wordNet:
     def __init__(self, config = None):
         #super().__init__()
         self.config = config
+        self.selection_method = config['selection_method']
+        self.is_tokenized = self.config["is_tokenized"]
         if config.get("lemmantize",False):
             self.lemmatizer = WordNetLemmatizer()
 
@@ -141,7 +196,8 @@ class wordNet:
         :return:
         """
 
-        if not self.config["isTokenized"]:
+
+        if not self.is_tokenized:
             x = word_tokenize(x)
         if self.config.get("lemmantize", False):
             x = self.lemmatization(x)
@@ -149,23 +205,44 @@ class wordNet:
         if self.config.get("filter_tags", None) is not None:
             ##filter tags
             x = self.filter_tags(x, self.config["filter_tags"] )
-        if self.config["selection_method"] == "raw_words":
+        if self.selection_method == "raw_words":
 
             # if the selection method is 'None' means to not apply the wordNet transformations
             # it will just keep the words
             return [word for word, tag in x ]
         x = self.get_wordnet_tag(x)
 
-        if self.config["selection_method"] == "first_value":
+        if self.selection_method == "first_value":
             x = self.get_wordnet_value(x)
             x = self.get_the_first(x)
-        elif self.config["selection_method"] == "lesk":
+        elif self.selection_method == "lesk":
             x = self.get_wordnet_lesk_synset(x)
-        elif self.config["selection_method"] == "word_and_lesk":
+        elif self.selection_method == "word_and_lesk":
             x = self.get_wordnet_and_word_lesk_synset(x)
         else:
             raise ValueError("The selection method should be 'lesk' or 'first_value'or 'word_and_lesk or 'raw_words' ")
         return x
+
+
+def attributes_parser(self):
+
+    if self.lexical_similarity == "words_similarity":
+        if self.selection_method != "raw_words":
+            raise ValueError("If you want use the word_similarity method you should use raw words instead of wordNet." +
+                             "\nPlease set 'selection_method' : 'raw_words' in the configuration ")
+    if self.vector_similarity == "v_jaccard_similarity":
+        print("WARNING : You've indicated the lexical similarity function {}. \n But jaccard similarity doesn't make use of the lexical similarity function".format(self.lexical_similarity))
+
+    if self.lexical_similarity in [ "wordnet_res_similarity", "wordnet_jcn_similarity", "wordnet_lin_similarity"]:
+        if not hasattr(self,"corpus_ic"):
+            raise ValueError("You've indicated the lexical similarity method {}. ".format(self.lexical_similarity) +
+                             "But this method needs to provide an information content. \n"+
+                             "Please add one of the following to the configuration dictionary:"
+                            " 'corpus_ic' : 'ic-brown.dat'  or 'corpus_ic' : 'ic-semcor.dat' ")
+
+    if hasattr(self, "vector_threshold"):
+        if self.vector_similarity == "v_jaccard_similarity":
+            print("You're setting a numerical vector threshold but using a vector similarity function that doesn't use numerical representations.")
 
 
 class textSimilarity(wordNet):
@@ -190,22 +267,18 @@ class textSimilarity(wordNet):
     def __init__(self, config):
         super().__init__(config)
         self.__WordNetError__ = 0
-        self.similarity_threshold = 0
+        self.similarity_threshold = config.get("similarity_threshold", 0)
         if config.get("IC_type", None) is not None:
-            #corpus_ic = wordnet_ic.ic('ic-brown.dat')
-            #corpus_ic = wordnet_ic.ic('ic-semcor.dat')
             self.corpus_ic = wordnet_ic.ic(config["IC_type"])
-        if config.get("similarity_threshold", None) is not None:
-            self.similarity_threshold = config["similarity_threshold"]
         try:
             # self.lexical_similarity = "wordnet_" + config["lexical_similarity"]
             self.lexical_similarity = config["lexical_similarity"]
-            self.match_method = config.get("match_method","similarity_match_vector_method")
+            # self.match_method = config.get("match_method","similarity_match_vector_method")
             self.vector_similarity = "v_" + config["vector_similarity"]
-            #print("Using {} lexical similarity method  -- {} vector similarity method -- match method {} ".format(self.lexical_similarity, self.vector_similarity , self.match_method))
         except KeyError:
             print("Similarity_name property specify the type of similarity to apply.\n\
-                           Currently implemented are: path_similarity, lch_similarity, wup_similarity, res_similarity, jcn_similarity, lin_similarity")
+                           Currently implemented are: wordnet_path_similarity, wordnet_lch_similarity, wordnet_wup_similarity, wordnet_res_similarity, " +
+                  "wordnet_jcn_similarity, wordnet_lin_similarity, words_similarity and similarity_word2vec")
             pass
 
         # if self.lexical_similarity == "wordnet_" +"model_word2vec":
@@ -219,113 +292,11 @@ class textSimilarity(wordNet):
         else:
             self.numerical_representation = True
 
-    ######################################################################
-    # -------- methods for computing similarity between words -----------
-    ######################################################################
-
-    def wordnet_path_similarity(self, word1, word2):
-        """
-        between 0 as 1
-        :param word2:
-        :return:
-        """
-        return word1.path_similarity(word2)
-
-    def wordnet_lch_similarity(self, word1, word2):
-        """
-        without upper bound
-        :param word2:
-        :return:
-        """
-        if word1.pos() != word2.pos():
-            ##if the classes are completly different it means they are completly far
-            return 0
-        return word1.lch_similarity(word2)
-
-    def wordnet_wup_similarity(self, word1, word2):
-        """
-        between 0 as 1
-        :param word2:
-        :return:
-        """
-        return word1.wup_similarity(word2)
-
-    def wordnet_res_similarity(self, syns1, syns2):
-        """
-        IC based method. Need to have config["IC"] equal to True and
-                     config["IC_type"] specifying the IC type
-        :param syns2:
-        :return:
-        """
-        if syns1.pos() != syns2.pos():
-            return 0
-        return syns1.res_similarity(syns2, self.corpus_ic)
-
-    def wordnet_jcn_similarity(self, syns1, syns2):
-        """
-        IC based method. Need to have config["IC"] equal to True and
-                     config["IC_type"] specifying the IC type
-        :param syns2:
-        :return:
-        """
-        if syns1.pos() != syns2.pos():
-            return 0
-        return syns1.jcn_similarity(syns2, self.corpus_ic)
-
-    def wordnet_lin_similarity(self, syns1, syns2):
-        """
-        IC based method. Need to have config["IC"] equal to True and
-                     config["IC_type"] specifying the IC type
-        :param syns2:
-        :return:
-        """
-        if syns1.pos() != syns2.pos():
-            return 0
-        return syns1.lin_similarity(syns2, self.corpus_ic)
-
-    def similarity_word2vec(self, w1, w2):
-        """
-        Word2vect model is the only method to measure similarity between
-        two words that is in this module
-        :param w1: word1
-        :param w2: word2
-        :return: similarity between the two words
-        """
-        try:
-            v1 = self.model_word2vec[w1]
-            v2 = self.model_word2vec[w2]
-            result = self.v_cosine_similarity(v1, v2)
-        except KeyError:
-            result = 0
-        return result
+        attributes_parser(self)
 
     ######################################################################
     # -------- methods for computing similarity between words -----------
     ######################################################################
-
-    def levenshtein_distance(self, word1, word2, normalized=True):
-        m, n = len(word1), len(word2)
-        DD = np.zeros((m + 1, n + 1))
-        DD[:, 0] = range(m + 1)
-        DD[0, :] = range(n + 1)
-
-        for t1 in range(1, m + 1):
-            for t2 in range(1, n + 1):
-                if (word1[t1 - 1] == word2[t2 - 1]):
-                    DD[t1][t2] = DD[t1 - 1][t2 - 1]
-                else:
-                    delete = DD[t1][t2 - 1]
-                    insert = DD[t1 - 1][t2]
-                    replace = DD[t1 - 1][t2 - 1]
-
-                    cost_v = [replace, insert, delete]
-                    min_cost = min(cost_v)
-
-                    DD[t1][t2] = min_cost + 1
-        distance = DD[-1][-1]
-        if normalized:
-            distance = distance / max(m, n)
-        return distance
 
 
     def wordnet_and_match(self, similarity, word1, word2):
@@ -361,45 +332,128 @@ class textSimilarity(wordNet):
         path_sim = 0 if path_sim is None else path_sim
         return max(path_sim,word_sim)
 
-    def wordnet_path_similarity_and_match(self, word1, word2):
+
+
+
+    def _wordnet_path_similarity_(self, syns1, syns2):
+        """
+        between 0 as 1
+        :param word2:
+        :return:
+        """
+        return syns1.path_similarity(syns2)
+
+    def wordnet_path_similarity(self, syns1, syns2):
         """
         Computes similarity between two words using
         path similarity
         """
-        return self.wordnet_and_match(self.wordnet_path_similarity, word1, word2)
+        return self.wordnet_and_match(self._wordnet_path_similarity_, syns1, syns2)
 
-    def wordnet_lch_similarity_and_match(self, word1, word2):
+
+    def _wordnet_lch_similarity_(self, syns1, syns2):
+        """
+        without upper bound
+        :param word2:
+        :return:
+        """
+        if syns1.pos() != syns2.pos():
+            ##if the classes are completly different it means they are completly far
+            return 0
+        return syns1.lch_similarity(syns2)
+
+    def wordnet_lch_similarity(self, syns1, syns2):
         """
         Computes similarity between two words using
         lch similarity
         """
-        return self.wordnet_and_match(self.wordnet_lch_similarity, word1, word2)
+        return self.wordnet_and_match(self._wordnet_lch_similarity_, syns1, syns2)
 
-    def wordnet_wup_similarity_and_match(self, word1, word2):
+
+    def _wordnet_wup_similarity_(self, syns1, syns2):
+        """
+        between 0 as 1
+        :param word2:
+        :return:
+        """
+        return syns1.wup_similarity(syns2)
+
+
+    def wordnet_wup_similarity(self, syns1, syns2):
         """
         Computes similarity between two words using
         wup similarity
         """
-        return self.wordnet_and_match(self.wordnet_wup_similarity, word1, word2)
+        return self.wordnet_and_match(self._wordnet_wup_similarity_, syns1, syns2)
 
-    def wordnet_res_similarity_and_match(self, word1, word2):
+
+    def _wordnet_res_similarity_(self, syns1, syns2):
+        """
+        IC based method. Need to have config["IC"] equal to True and
+                     config["IC_type"] specifying the IC type
+        :param syns2:
+        :return:
+        """
+        if syns1.pos() != syns2.pos():
+            return 0
+        return syns1.res_similarity(syns2, self.corpus_ic)
+
+
+    def wordnet_res_similarity(self, syns1, syns2):
         """
         Computes similarity between two words using
         res similarity
         """
-        return self.wordnet_and_match(self.wordnet_res_similarity, word1, word2)
+        return self.wordnet_and_match(self._wordnet_res_similarity_, syns1, syns2)
 
-    def wordnet_jcn_similarity_and_match(self, word1, word2):
+
+    def _wordnet_jcn_similarity_(self, syns1, syns2):
+        """
+        IC based method. Need to have config["IC"] equal to True and
+                     config["IC_type"] specifying the IC type
+        :param syns2:
+        :return:
+        """
+        if syns1.pos() != syns2.pos():
+            # If they have different postag they cannot be compare on
+            # wordNet
+            return 0
+        return syns1.jcn_similarity(syns2, self.corpus_ic)
+
+
+    def wordnet_jcn_similarity(self, syns1, syns2):
         """
         Computes similarity between two words using
         jcn similarity. Note than to have a normalized value
         in here we need to divide up by 3e150.
         3e150 is the maximum value that jcn similarity can have
         """
-        result = self.wordnet_and_match(self.wordnet_jcn_similarity, word1, word2)#/3e300
+        result = self.wordnet_and_match(self._wordnet_jcn_similarity_, syns1, syns2)#/3e300
         return result/3e150
 
-    def wordnet_just_similarity_and_match(self, word1, word2):
+
+    def _wordnet_lin_similarity_(self, syns1, syns2):
+        """
+        IC based method. Need to have config["IC"] equal to True and
+                     config["IC_type"] specifying the IC type
+        :param syns2:
+        :return:
+        """
+        if syns1.pos() != syns2.pos():
+            return 0
+        return syns1.lin_similarity(syns2, self.corpus_ic)
+
+
+    def wordnet_lin_similarity(self, syns1, syns2):
+        """
+        Computes similarity between two words using
+        lin similarity.
+        """
+        result = self.wordnet_and_match(self._wordnet_lin_similarity_, syns1, syns2)
+        return result
+
+
+    def words_similarity(self, word1, word2):
         """
         Simple similarity for exact match, i.e
         similarity is equal to 1 if words are equal, otherwise 0
@@ -407,42 +461,49 @@ class textSimilarity(wordNet):
         res = 1 if word1 == word2 else 0
         return res
 
-    #
-    # def similarity_match_double_mean(self, row, col1, col2 ):
-    #     """
-    #     This method computes twice the mean for the similarity vectors
-    #     For example:
-    #     sim_vect_sentence1 = [ 0.001, 0.8973, 0.1232]
-    #     sim_vect_sentence2 = [  0.8973 , 0]
-    #     Then the similairyt between the two sentences will be
-    #     mean( mean(sim_vect_sentence1),mean(sim_vect_sentence2) ) =
-    #     mean( mean([ 0.001, 0.8973, 0.1232]),mean([  0.8973 , 0]) )  =
-    #     mean( 0.3405 , 0.44865 ) = 0.394575
-    #
-    #     """
-    #     threshold = self.similarity_threshold
-    #     similarity = self.__getattribute__(self.lexical_similarity)
-    #
-    #     row1, row2 = row.get(col1), row.get(col2)
-    #     row1 = listUtils.filter_None(row1)
-    #     row2 = listUtils.filter_None(row2)
-    #     sim1 = []
-    #     sim2 = []
-    #     if len(row1) == 0 or len(row2) == 0:
-    #         return 0
-    #     for syn1 in row1:
-    #         # print(syn1, row1, row2)
-    #         sym12 = listUtils.filter_None([similarity(syn1, syn2) for syn2 in row2])
-    #         sym12 = [x if x > threshold else 0 for x in sym12]
-    #         if sym12: sim1.append(np.max(sym12))
-    #     for syn2 in row2:
-    #         sym21 = listUtils.filter_None([similarity(syn1, syn2) for syn1 in row1])
-    #         sym21 = [x if x > threshold else 0 for x in sym21]
-    #         if sym21: sim2.append(np.max(sym21))
-    #     # result = max(np.mean(sim1), np.mean(sim2))
-    #     result = np.mean([np.mean(sim1), np.mean(sim2)])
-    #     # result = np.mean([  max(np.mean(sim1), np.mean(sim2))  ,  np.mean([ np.mean(sim1), np.mean(sim2) ])   ])
-    #     return result
+    def similarity_word2vec(self, w1, w2):
+        """
+        Word2vect model is the only method to measure similarity between
+        two words that is in this module
+        :param w1: word1
+        :param w2: word2
+        :return: similarity between the two words
+        """
+        try:
+            v1 = self.model_word2vec[w1]
+            v2 = self.model_word2vec[w2]
+            result = self.v_cosine_similarity(v1, v2)
+        except KeyError:
+            result = 0
+        return result
+
+    def levenshtein_distance(self, word1, word2, normalized=True):
+        m, n = len(word1), len(word2)
+        DD = np.zeros((m + 1, n + 1))
+        DD[:, 0] = range(m + 1)
+        DD[0, :] = range(n + 1)
+
+        for t1 in range(1, m + 1):
+            for t2 in range(1, n + 1):
+                if (word1[t1 - 1] == word2[t2 - 1]):
+                    DD[t1][t2] = DD[t1 - 1][t2 - 1]
+                else:
+                    delete = DD[t1][t2 - 1]
+                    insert = DD[t1 - 1][t2]
+                    replace = DD[t1 - 1][t2 - 1]
+
+                    cost_v = [replace, insert, delete]
+                    min_cost = min(cost_v)
+
+                    DD[t1][t2] = min_cost + 1
+        distance = DD[-1][-1]
+        if normalized:
+            distance = distance / max(m, n)
+        return distance
+
+    ######################################################################
+    # -------- methods for computing similarity between vectors ----------
+    ######################################################################
 
     def similarity_numerical_vector(self,row, col1, col2):
         """
@@ -500,6 +561,7 @@ class textSimilarity(wordNet):
         s2 = set(v2)
         return len(s1.intersection(s2)) / len(s1.union(s2))
 
+
     def v_cosine_similarity(self, v1, v2):
 
 
@@ -524,7 +586,7 @@ class textSimilarity(wordNet):
         """
         return np.mean( [np.mean(v1), np.mean(v2) ] )
 
-    def similarity_match_vector_method(self,row, col1, col2 ):
+    def similarity_match_method(self,row, col1, col2 ):
         """
         Unless specify otherwise this method is the one using by default
 
@@ -535,27 +597,24 @@ class textSimilarity(wordNet):
         """
         if self.numerical_representation:
             v1, v2 = self.similarity_numerical_vector(row, col1, col2 )
+            if self.config.get("vector_threshold", False):
+                vector_threshold = self.config["vector_threshold"]
+                # print("Applying threshold {} to the vectors".format(vector_threshold))
+                v1 = [x if x > vector_threshold else 0 for x in v1]
+                v2 = [x if x > vector_threshold else 0 for x in v2]
         else:
             v1,v2 = row.get(col1), row.get(col2)
         vector_similarity = self.__getattribute__(self.vector_similarity)
-        if self.config.get("vector_threshold", False):
-            vector_threshold = self.config["vector_threshold"]
-            #print("Applying threshold {} to the vectors".format(vector_threshold))
-            v1 = [ x if x > vector_threshold else 0 for x in v1 ]
-            v2 = [ x if x > vector_threshold else 0 for x in v2 ]
+
         return vector_similarity(v1,v2)
 
-    # def similarity_match_vector_mean(self,row, col1, col2 ):
-    #     v1, v2 = self.similarity_match_vector(row, col1, col2 )
-    #
-    #     return max(np.mean(v1), np.mean(v2))
+    def apply(self, x, col1, col2):
+        x[col1] = self.text_preparation(x.get(col1))
+        x[col2] = self.text_preparation(x.get(col2))
 
-    def similarity_match_method(self,row, col1, col2):
-        try:
-            match_method_apply = self.__getattribute__(self.match_method)
-        except AttributeError:
-            AttributeError("{} is not currently implement. The methods implemented are similarity_match_vector_method and similarity_match_vector ".format(self.match_method))
-        return match_method_apply(row, col1, col2)
+        result = self.similarity_match_method(x, col1, col2)
+        return result
+
 
 
 if __name__ == "__main__":
@@ -585,7 +644,7 @@ if __name__ == "__main__":
     # df_train["sentence1_frmt"] = df_train["sentence1"].apply(cleanText2)#.apply(lambda x: ' '.join(cleanText(x)) )
     # df_train["sentence2_frmt"] = df_train["sentence2"].apply(cleanText2)#.apply(lambda x: ' '.join(cleanText(x)) )
 
-    config = {"isTokenized": False,
+    config = {"is_tokenized": False,
                 "selection_method": "None",
                 #                   "filter_tags" :  ["J","N","V","R"],
                 "lexical_similarity": "model_word2vec",
