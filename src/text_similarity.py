@@ -559,13 +559,8 @@ class textSimilarity(wordNet):
 
 
 if __name__ == "__main__":
-    import nltk
-    from nltk.corpus import wordnet as wn
-    import pandas as pd
-    import sys
 
-    sys.path.insert(0, "../../utils_pie")
-    from preprocessing import *
+    import pandas as pd
 
     train_path = '../data/sts-train.csv'
     train_path = '../data/sts-test.csv'
@@ -574,23 +569,23 @@ if __name__ == "__main__":
                            , names=["genre", "filename", "year", "score", "sentence1", "sentence2"])
 
 
-    def cleanText2(x):
-        result = apply_re(x)
-        result = toLowerCase(result)
-        result = removeStopWords(result)
-        result = lemmatization(result, False)
-        return word_tokenize(result)
+    # def cleanText2(x):
+    #     result = apply_re(x)
+    #     result = toLowerCase(result)
+    #     result = removeStopWords(result)
+    #     result = lemmatization(result, False)
+    #     return word_tokenize(result)
+    #
+    #
+    # print("Missing {} rows, because there is nan values on them".format(
+    #     len(df_train.index) - len(df_train.dropna().index)))
+    # df_train = df_train.dropna()
+    # df_train = df_train.reset_index()
+    #
+    # df_train["sentence1_frmt"] = df_train["sentence1"].apply(cleanText2)#.apply(lambda x: ' '.join(cleanText(x)) )
+    # df_train["sentence2_frmt"] = df_train["sentence2"].apply(cleanText2)#.apply(lambda x: ' '.join(cleanText(x)) )
 
-
-    print("Missing {} rows, because there is nan values on them".format(
-        len(df_train.index) - len(df_train.dropna().index)))
-    df_train = df_train.dropna()
-    df_train = df_train.reset_index()
-
-    df_train["sentence1_frmt"] = df_train["sentence1"].apply(cleanText2)#.apply(lambda x: ' '.join(cleanText(x)) )
-    df_train["sentence2_frmt"] = df_train["sentence2"].apply(cleanText2)#.apply(lambda x: ' '.join(cleanText(x)) )
-
-    config = {"isTokenized": True,
+    config = {"isTokenized": False,
                 "selection_method": "None",
                 #                   "filter_tags" :  ["J","N","V","R"],
                 "lexical_similarity": "model_word2vec",
@@ -603,10 +598,9 @@ if __name__ == "__main__":
 
     __textSimilarity__ = textSimilarity(config)
 
-    df_train["test"] = df_train[["sentence1_frmt","sentence2_frmt"]].applymap(__textSimilarity__.text_preparation).apply(
+    df_train["test"] = df_train[["sentence1","sentence2"]].applymap(__textSimilarity__.text_preparation).apply(
             lambda x: __textSimilarity__.similarity_match_method(
             x, "sentence1_frmt", "sentence2_frmt")
             , axis=1)
-    print(df_train["test"])
 
 
