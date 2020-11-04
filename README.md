@@ -19,45 +19,45 @@ that specify the diferent steps to perform to the similarity between two classes
 
 
 PARAMETERS NEEDED
-- is_tokenized :  specify weather the input sentence is tokenized or not
-- selection_method : method to select the concept in wordNet
-    a. 'lesk' : use lesk algorithm to decide which concept to choose
-    b. 'first_value' : choose the first value among all the concepts
+- is_tokenized :  specify weather the input sentence is tokenized or not <br />
+- selection_method : method to select the concept in wordNet <br />
+    a. 'lesk' : use lesk algorithm to decide which concept to choose <br />
+    b. 'first_value' : choose the first value among all the concepts <br />
     c. 'word_and_lesk : it'll use the lesk algorithm to choose the concept
         but in case the word is not in wordNet db, it will preserve the word
-        as a string
+        as a string <br />
     d. 'raw_words' : use this method when using the lexical similarity functions
-        similarity_word2vec and words_similarity
-- lexical_similarity : similarity measure between two word, Currently implemented
-    a. wordnet_path_similarity
-    b. wordnet_lch_similarity
-    c. wordnet_wup_similarity
-    d. wordnet_res_similarity : needs corpusIC
-    e. wordnet_jcn_similarity : needs corpusIC
-    f. wordnet_lin_similarity : needs corpusIC
-    g. words_similarity
-    h. similarity_word2vec
-- vector_similarity : given two vectors this function will give a similarity score
+        similarity_word2vec and words_similarity <br />
+- lexical_similarity : similarity measure between two word, Currently implemented <br />
+    a. wordnet_path_similarity <br />
+    b. wordnet_lch_similarity <br />
+    c. wordnet_wup_similarity <br />
+    d. wordnet_res_similarity : needs corpusIC <br />
+    e. wordnet_jcn_similarity : needs corpusIC <br />
+    f. wordnet_lin_similarity : needs corpusIC <br />
+    g. words_similarity <br />
+    h. similarity_word2vec <br />
+- vector_similarity : given two vectors this function will give a similarity score <br />
     a. jaccard_similarity : this function differs from the other vector function
-       because it works on the raw word and doesn't need a lexical similarity function
+       because it works on the raw word and doesn't need a lexical similarity function <br />
     b. cosine_similarity : this function will use the cosine_similairty to compute the
-       distance between two numerical vectors
-    c. mean_similarity : this function will compute the double mean of the vectors
+       distance between two numerical vectors  <br />
+    c. mean_similarity : this function will compute the double mean of the vectors  <br />
 
 OPTIONAL PARAMETERS
-- corpus_ic: Describe the data to use to create the information content
-    a. 'ic-brown.dat'
-    b. 'ic-semcor.dat'
+- corpus_ic: Describe the data to use to create the information content  <br />
+    a. 'ic-brown.dat'  <br />
+    b. 'ic-semcor.dat'  <br />
 
-Other preprocessing optional parameters are
-- is_tokenized : Weather the input sentence is tokenized or not :  True or False
-- lemmantize: If True it will lemmantize the sentence
-- filter_tags : list of tags to filter among ["J","N","V","R"]
+Other preprocessing optional parameters are  <br />
+- is_tokenized : Weather the input sentence is tokenized or not :  True or False  <br />
+- lemmantize: If True it will lemmantize the sentence  <br />
+- filter_tags : list of tags to filter among ["J","N","V","R"]  <br />
 
 - vector_threshold : numerical lower threshold to decide weather or not
-  to account for that similarity. For examples, if we have the similarity vectors
-  v1 = [0.01, 0.5, 0.8] and v2 = [ 0.0, 0.06, 0.9]
-  and we set the threshold to 0.1 then v1 and v2 will become
+  to account for that similarity. For examples, if we have the similarity vectors  <br />
+  v1 = [0.01, 0.5, 0.8] and v2 = [ 0.0, 0.06, 0.9]  <br />
+  and we set the threshold to 0.1 then v1 and v2 will become  <br />
   v1 = [0.0 , 0.5, 0.8] and v2 = [ 0.0, 0.0, 0.9]
 
 
